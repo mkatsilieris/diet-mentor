@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { badRequest } from '../errors.js';
-import { isTime, type NotificationSettings } from '../lib/nudges.js';
+import { SETTINGS_COLUMNS, isTime, type NotificationSettings } from '../lib/nudges.js';
 import { pushPublicKey, sendPushToUser } from '../notify.js';
 import { loadNotificationSettings } from '../reminders.js';
 
@@ -62,6 +62,10 @@ const settingsBody = z
     motivation: z.boolean(),
     motivation_time: time,
     weekly: z.boolean(),
+    energy: z.boolean(),
+    energy_gap_min: z.number().int().min(120, 'Τουλάχιστον 2 ώρες').max(480, 'Ως 8 ώρες'),
+    energy_from: time,
+    energy_until: time,
   })
   .partial();
 
@@ -80,11 +84,24 @@ notificationsRouter.put('/', async (req, res) => {
   const next: NotificationSettings = { ...current, ...Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined)) };
   next.reminder_times = [...new Set(next.reminder_times)].sort();
   if (next.reminders && next.reminder_times.length === 0) throw badRequest('Βάλε τουλάχιστον μία ώρα υπενθύμισης, ή κλείσε τις υπενθυμίσεις');
+  if (next.energy_from >= next.energy_until) throw badRequest('Η ώρα «από» πρέπει να είναι πριν από την ώρα «ως»');
 
   const { rows } = await pool.query<NotificationSettings>(
-    `UPDATE notification_settings SET reminders = $2, reminder_times = $3, motivation = $4, motivation_time = $5, weekly = $6, updated_at = now()
-      WHERE user_id = $1 RETURNING reminders, reminder_times, motivation, motivation_time, weekly`,
-    [req.user.id, next.reminders, next.reminder_times, next.motivation, next.motivation_time, next.weekly],
+    `UPDATE notification_settings SET reminders = $2, reminder_times = $3, motivation = $4, motivation_time = $5, weekly = $6,
+       energy = $7, energy_gap_min = $8, energy_from = $9, energy_until = $10, updated_at = now()
+      WHERE user_id = $1 RETURNING ${SETTINGS_COLUMNS}`,
+    [
+      req.user.id,
+      next.reminders,
+      next.reminder_times,
+      next.motivation,
+      next.motivation_time,
+      next.weekly,
+      next.energy,
+      next.energy_gap_min,
+      next.energy_from,
+      next.energy_until,
+    ],
   );
   req.log.info({ user: req.user.id, reminders: next.reminders ? next.reminder_times : [], motivation: next.motivation }, 'notification settings saved');
   res.json(await envelope(req.user.id, rows[0]));
