@@ -321,3 +321,108 @@
 .time-chip input {
   width: auto;
 }
+
+/* ---- pace of the day & meal plan ---- */
+.pace-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin: 14px 0 4px;
+}
+.pace-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+.pace-bar.behind .pace-fill {
+  background: #d97706;
+}
+.pace-bar.ahead .pace-fill {
+  background: var(--neg);
+}
+.pace-marker {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.pace-marker span {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pace-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pace-steps li {
+  display: grid;
+  grid-template-columns: 22px 46px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.pace-steps li:last-child {
+  border-bottom: 0;
+}
+.pace-steps .num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pace-steps .upcoming {
+  color: var(--muted);
+}
+.pace-steps .late .pace-mark {
+  color: #d97706;
+  font-weight: 700;
+}
+.pace-steps .covered .pace-mark {
+  color: var(--pos);
+  font-weight: 700;
+}
+.chip.good {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: transparent;
+}
+.chip.bad {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  .chip.good {
+    background: #0f3d2e;
+    color: #6ee7b7;
+  }
+  .chip.bad {
+    background: #45161a;
+    color: #fca5a5;
+  }
+}
+.plan-row {
+  display: grid;
+  grid-template-columns: auto 1fr 52px 32px;
+  gap: 6px;
+  align-items: center;
+}
+.plan-row input {
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.plan-row input[type='time'] {
+  width: auto;
+}

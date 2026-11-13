@@ -4,6 +4,7 @@ import { TARGET_TOLERANCE, type Summary } from './summary.js';
 /**
  * What the app says by push notification, decided by plain rules:
  *   - meal reminders at the times the person chose, only when nothing was written since the previous one
+ *   - behind the meal plan of the day (the words for that are in pace.ts)
  *   - "eat something" when too many hours passed since the last meal, before hunger leads to overeating
  *   - once a day, a word about yesterday; new milestones; steps of the running diet
  *   - on Mondays, the week that ended
@@ -45,7 +46,7 @@ export const SETTINGS_COLUMNS = 'reminders, reminder_times, motivation, motivati
 
 export interface Nudge {
   dedupe: string;
-  kind: 'reminder' | 'energy' | 'daily' | 'milestone' | 'diet' | 'weekly';
+  kind: 'reminder' | 'energy' | 'pace' | 'daily' | 'milestone' | 'diet' | 'weekly';
   title: string;
   body: string;
   /** page opened by a tap */

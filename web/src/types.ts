@@ -143,9 +143,49 @@ export interface Body {
   plans: LossPlan[];
 }
 
+export interface PlanMeal {
+  /** 'HH:MM' */
+  time: string;
+  name: string;
+  /** share of the day's target, whole percent */
+  pct: number;
+}
+
+export interface MealPlan {
+  meals: PlanMeal[];
+  grace_min: number;
+  tolerance_pct: number;
+  notify: boolean;
+}
+
+export interface PaceStep extends PlanMeal {
+  kcal: number;
+  cumPct: number;
+  cumKcal: number;
+  state: 'covered' | 'late' | 'due' | 'upcoming';
+}
+
+/** Calories eaten against the calories the meal plan wants by this hour. */
+export interface Pace {
+  now: string;
+  target: number;
+  eaten: number;
+  due: number;
+  required: number;
+  allowed: number;
+  toleranceKcal: number;
+  status: 'behind' | 'on' | 'ahead';
+  diff: number;
+  shortBy: number;
+  lateMeal: PlanMeal | null;
+  next: PaceStep | null;
+  steps: PaceStep[];
+}
+
 export interface ReadySummary {
   ready: true;
   today: Day;
+  pace: Pace;
   body: Body;
   day: { day: Day; intake: number; entries: number; maintenance: number; target: number; remaining: number };
   periods: { week: Aggregate; prevWeek: Aggregate; month: Aggregate; prevMonth: Aggregate; last7: Aggregate; last30: Aggregate };
