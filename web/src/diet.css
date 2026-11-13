@@ -1,0 +1,323 @@
+/* ======================= Diet Mentor ======================= */
+/* On top of styles.css (the sheet shared with Bill Split and Weather Alert). */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* the dark primary is a light teal: dark text on it */
+    --primary-text: #042f2e;
+  }
+}
+
+@media (max-width: 400px) {
+  .nav-link {
+    padding: 8px 5px;
+    font-size: 0.85rem;
+  }
+  .topbar-inner {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+.stack.tight {
+  gap: 6px;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.stat-value.pos {
+  color: var(--pos);
+}
+.stat-value.neg {
+  color: var(--neg);
+}
+
+/* ---- day navigation ---- */
+.day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-nav .btn {
+  font-size: 1.3rem;
+  line-height: 1;
+  min-width: 44px;
+}
+.day-nav-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+/* ---- calories of the day ---- */
+.calorie-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.ring {
+  width: 136px;
+  height: 136px;
+  flex-shrink: 0;
+}
+.ring-track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 12;
+}
+.ring-value {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.3s;
+}
+.ring.over .ring-value {
+  stroke: var(--neg);
+}
+.ring-number {
+  fill: var(--text);
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ring-caption {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.facts {
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.facts dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .calorie-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ring {
+    align-self: center;
+  }
+}
+
+/* ---- diet strip & progress ---- */
+.diet-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text);
+}
+.diet-strip:hover {
+  text-decoration: none;
+  border-color: var(--primary);
+}
+.progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+}
+
+/* ---- food form & diary ---- */
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .entry-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.chip-button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  min-height: 36px;
+  padding: 6px 12px;
+  white-space: normal;
+  text-align: left;
+}
+.chip-button:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+.chip-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.entry-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  min-width: 44px;
+}
+.list-item .amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- the mentor ---- */
+.mentor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mentor-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.mentor-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 1px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.mentor-item.good .mentor-icon {
+  background: var(--success-bg);
+  border-color: transparent;
+  color: var(--success);
+}
+.mentor-item.warn .mentor-icon {
+  background: #fef3c7;
+  border-color: transparent;
+  color: #92400e;
+}
+@media (prefers-color-scheme: dark) {
+  .mentor-item.warn .mentor-icon {
+    background: #3b2f0f;
+    color: #fcd34d;
+  }
+}
+
+/* ---- milestones ---- */
+.milestones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 6px 16px;
+}
+.milestones li {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+}
+.milestones li.done {
+  color: var(--text);
+  font-weight: 600;
+}
+.milestones li.done > span:first-child {
+  color: #d97706;
+}
+
+/* ---- charts ---- */
+.chart .axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.chart .bar.pos {
+  fill: var(--pos);
+  opacity: 0.8;
+}
+.chart .bar.neg {
+  fill: var(--neg);
+  opacity: 0.8;
+}
+.chart .line {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.chart .line.faint {
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+.chart .dot {
+  fill: var(--surface);
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 2px solid var(--text);
+}
+.legend-line {
+  width: 18px;
+  border-top: 2px solid var(--primary);
+}
+.legend-line.faint {
+  border-top: 1.5px dashed var(--muted);
+}
+.table-scroll .table {
+  font-size: 0.82rem;
+}
+.table-scroll .table.periods td:first-child {
+  white-space: nowrap;
+}
+
+/* ---- notification settings ---- */
+.push-box {
+  padding: 12px;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+.time-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.time-chip input {
+  width: auto;
+}
