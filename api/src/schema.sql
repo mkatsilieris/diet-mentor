@@ -118,3 +118,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   UNIQUE (user_id, dedupe)
 );
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, created_at DESC);
+
+-- The meal plan: which share of the day's calories is due by which hour (see lib/pace.ts).
+-- meals is a list of {time 'HH:MM', name, pct}; people without a row follow the default plan.
+CREATE TABLE IF NOT EXISTS meal_plans (
+  user_id       INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  meals         JSONB NOT NULL,
+  grace_min     INT NOT NULL DEFAULT 45,
+  tolerance_pct INT NOT NULL DEFAULT 5,
+  notify        BOOLEAN NOT NULL DEFAULT true,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);

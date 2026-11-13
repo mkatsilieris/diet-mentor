@@ -6,6 +6,7 @@ import type { Day, EntriesResponse, Entry, Food, Summary } from '../types';
 import { pushState, type PushState } from '../push';
 import { Empty, ErrorBox, Field, InfoBox, Spinner } from '../components/ui';
 import { CalorieRing, Mentor, ProgressBar, SetupPrompt } from '../components/widgets';
+import { PaceCard } from '../components/PaceCard';
 
 /** The food diary of one day (today unless another is picked) next to the calories that day allows. */
 export default function Today() {
@@ -33,6 +34,14 @@ export default function Today() {
   useEffect(() => {
     loadSummary().catch((err) => setError(errorMessage(err)));
     void pushState().then(setPush);
+    // the pace of the day moves with the clock: read it again every few minutes and when the app comes back
+    const refresh = () => document.visibilityState === 'visible' && void loadSummary().catch(() => undefined);
+    const timer = window.setInterval(refresh, 5 * 60_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, [loadSummary]);
 
   useEffect(() => {
@@ -174,6 +183,8 @@ export default function Today() {
           </div>
         </dl>
       </section>
+
+      {isToday && <PaceCard pace={summary.pace} />}
 
       {isToday &&
         (diet ? (

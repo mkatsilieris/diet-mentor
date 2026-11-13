@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import type { User } from '../types';
 import { Avatar, ErrorBox, Field, SuccessBox } from '../components/ui';
 import { NotificationsCard } from '../components/NotificationsCard';
+import { MealPlanCard } from '../components/MealPlanCard';
 
 export default function Profile() {
   const { user, setUser, logout, viaAccess } = useAuth();
@@ -63,6 +64,7 @@ export default function Profile() {
       <ErrorBox error={error} />
       <SuccessBox message={ok} />
 
+      <MealPlanCard />
       <NotificationsCard />
 
       <section className="card stack">
