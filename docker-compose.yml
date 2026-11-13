@@ -1,0 +1,84 @@
+# Diet Mentor - calories, deficit and diet sessions
+# Usage:  cp .env.example .env  &&  docker compose up -d --build
+# Then open http://<host>:8082
+# Internet access goes through a Cloudflare Tunnel (see README):
+#   set COMPOSE_PROFILES=internet and TUNNEL_TOKEN in .env.
+
+# Every container logs to stdout; docker keeps the lines and rotates them (5 x 10 MB per service).
+#   docker compose logs -f api
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-diet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-diet}
+      POSTGRES_DB: ${POSTGRES_DB:-diet}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-diet} -d ${POSTGRES_DB:-diet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    logging: *logging
+    # Cloudflare Access SSO settings (not secret, see README). Empty the file to disable.
+    env_file:
+      - cloudflare-access.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://${POSTGRES_USER:-diet}:${POSTGRES_PASSWORD:-diet}@db:5432/${POSTGRES_DB:-diet}
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+      APP_URL: ${APP_URL:-http://localhost:8082}
+      DISPLAY_TZ: ${DISPLAY_TZ:-Europe/Athens}
+      # web push (empty = generated once and kept in the database)
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:no-reply@example.com}
+      # e-mail (optional)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Diet Mentor <no-reply@example.com>}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "${WEB_PORT:-8082}:80"
+    depends_on:
+      - api
+
+  # Cloudflare Tunnel: publishes the web container as https://<hostname> without opening
+  # router ports. Only started when COMPOSE_PROFILES=internet is set in .env.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: [internet]
+    restart: unless-stopped
+    logging: *logging
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
