@@ -7,7 +7,7 @@
 // secret) is printed for the .env of the server.
 //
 //   CLOUDFLARE_API_TOKEN=... node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com \
-//       [--account <account id>] [--team-domain <team>.cloudflareaccess.com] [--emails a@x.gr,b@y.gr | --copy-emails-from <access app id>]
+//       [--account <account id>] [--team-domain <team>.cloudflareaccess.com] [--emails a@x.gr,b@y.gr | --copy-emails-from <hostname or id of another Access app>]
 //
 // Token scopes (My Profile > API Tokens > Create Token > Custom):
 //   Account > Cloudflare Tunnel: Edit, Account > Access: Apps and Policies: Edit, Zone > DNS: Edit
@@ -104,7 +104,14 @@ else {
 
 let emails = (args.emails ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 if (emails.length === 0 && args['copy-emails-from']) {
-  const src = await cf('GET', `/accounts/${account}/access/apps/${args['copy-emails-from']}/policies`);
+  // an application id, or the hostname of the application (bills.ninblack.com), which is easier to know
+  let from = args['copy-emails-from'];
+  if (from.includes('.')) {
+    const other = (await cf('GET', `/accounts/${account}/access/apps`)).find((a) => a.domain === from);
+    if (!other) fail(`No Access application found for ${from}`);
+    from = other.id;
+  }
+  const src = await cf('GET', `/accounts/${account}/access/apps/${from}/policies`);
   emails = src.flatMap((p) => p.include ?? []).map((r) => r.email?.email).filter(Boolean);
   step(`copied ${emails.length} e-mail(s) from the policy of application ${args['copy-emails-from']}`);
 }

@@ -112,7 +112,7 @@ Cloudflare Tunnel + Access (δικό του tunnel `diet-mentor` και Access a
 
 ```powershell
 $env:CLOUDFLARE_API_TOKEN = "..."
-node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com --copy-emails-from <id της Access app του Bill Split>
+node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com --copy-emails-from bills.ninblack.com
 ```
 
 Γράφει `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` στο `cloudflare-access.env` (κάνε commit, πάει με το deploy) και τυπώνει το
