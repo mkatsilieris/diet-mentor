@@ -4,6 +4,7 @@ import { TARGET_TOLERANCE, type Summary } from './summary.js';
 /**
  * What the app says by push notification, decided by plain rules:
  *   - meal reminders at the times the person chose, only when nothing was written since the previous one
+ *   - "eat something" when too many hours passed since the last meal, before hunger leads to overeating
  *   - once a day, a word about yesterday; new milestones; steps of the running diet
  *   - on Mondays, the week that ended
  * Every nudge has a `dedupe` key; the scheduler sends each key to a person at most once.
@@ -18,6 +19,13 @@ export interface NotificationSettings {
   motivation: boolean;
   motivation_time: string;
   weekly: boolean;
+  /** "eat something" when too long passed since the last meal */
+  energy: boolean;
+  /** minutes without a meal before the nudge */
+  energy_gap_min: number;
+  /** the part of the day in which it may arrive, 'HH:MM' */
+  energy_from: string;
+  energy_until: string;
 }
 
 export const DEFAULT_SETTINGS: NotificationSettings = {
@@ -26,11 +34,18 @@ export const DEFAULT_SETTINGS: NotificationSettings = {
   motivation: true,
   motivation_time: '09:00',
   weekly: true,
+  energy: true,
+  energy_gap_min: 240,
+  energy_from: '08:00',
+  energy_until: '21:30',
 };
+
+/** The columns of notification_settings that make a NotificationSettings, for SELECT and RETURNING. */
+export const SETTINGS_COLUMNS = 'reminders, reminder_times, motivation, motivation_time, weekly, energy, energy_gap_min, energy_from, energy_until';
 
 export interface Nudge {
   dedupe: string;
-  kind: 'reminder' | 'daily' | 'milestone' | 'diet' | 'weekly';
+  kind: 'reminder' | 'energy' | 'daily' | 'milestone' | 'diet' | 'weekly';
   title: string;
   body: string;
   /** page opened by a tap */
@@ -86,6 +101,60 @@ export function mealReminder(slot: string, times: string[], entryTimes: string[]
     body = `Έχεις γράψει ${kcal(day.intake)}, ${kcal(day.remaining)} πάνω από τον στόχο. Γράψε και ό,τι άλλο έφαγες, για να είναι σωστή η εικόνα.`;
   }
   return { dedupe: `reminder/${day.day}/${slot}`, kind: 'reminder', title, body, url: '/' };
+}
+
+/** Smaller entries (a coffee, a sweetener) are not a meal: they do not restart the clock. */
+export const MEAL_MIN_KCAL = 50;
+/** A second, last call this long after the first when still nothing was eaten. */
+export const ENERGY_REPEAT_MIN = 90;
+/** Below this much room in the day's target the app does not push to eat. */
+export const ENERGY_MIN_REMAINING = 100;
+
+export interface EnergyGap {
+  dedupe: string;
+  /** time of the last meal today, null when there was none */
+  lastMeal: string | null;
+  gapMin: number;
+  /** 0 = first call, 1 = the repeat */
+  stage: 0 | 1;
+}
+
+/**
+ * Whether too long passed since the last meal: the gap is counted from the last entry of today that
+ * is a meal (or from `energy_from` on a day without one), only inside the chosen part of the day.
+ * The key holds the meal it counts from, so a new meal starts a new count and each gap speaks twice at most.
+ */
+export function energyGap(now: string, day: Day, entries: { time: string; kcal: number }[], settings: NotificationSettings): EnergyGap | null {
+  if (!settings.energy || now < settings.energy_from || now > settings.energy_until) return null;
+  const lastMeal =
+    entries
+      .filter((e) => e.kcal >= MEAL_MIN_KCAL && e.time <= now)
+      .map((e) => e.time)
+      .sort()
+      .at(-1) ?? null;
+  const gapMin = minutes(now) - minutes(lastMeal ?? settings.energy_from);
+  if (gapMin < settings.energy_gap_min) return null;
+  const stage = gapMin >= settings.energy_gap_min + ENERGY_REPEAT_MIN ? 1 : 0;
+  return { dedupe: `energy/${day}/${lastMeal ?? 'none'}/${stage}`, lastMeal, gapMin, stage };
+}
+
+/** The words for a gap, or null when the day's calories are already used up. */
+export function energyNudge(gap: EnergyGap, s: ReadySummary): Nudge | null {
+  if (s.day.remaining < ENERGY_MIN_REMAINING) return null;
+  const hours = `${(Math.round(gap.gapMin / 30) / 2).toLocaleString('el-GR')} ώρες`;
+  const title = gap.lastMeal === null ? 'Δεν έχεις φάει τίποτα σήμερα' : gap.stage === 1 ? `Ήδη ${hours} χωρίς φαγητό` : `${hours} χωρίς φαγητό`;
+  const since = gap.lastMeal === null ? '' : `Τελευταίο γεύμα στις ${gap.lastMeal}. `;
+  const what =
+    s.day.remaining >= 400
+      ? 'Φάε κάτι τώρα, πριν πέσει η ενέργεια και η πείνα σε πάει σε υπερφαγία αργότερα.'
+      : 'Κάτι μικρό τώρα (φρούτο, γιαούρτι) κρατά την ενέργεια και σε γλιτώνει από υπερφαγία αργότερα.';
+  return {
+    dedupe: gap.dedupe,
+    kind: 'energy',
+    title,
+    body: `${since}${what} Σου μένουν ${kcal(s.day.remaining)} για σήμερα. Αν έφαγες ήδη, γράψε το.`,
+    url: '/',
+  };
 }
 
 /** The once-a-day word about yesterday. */

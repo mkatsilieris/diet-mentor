@@ -9,13 +9,19 @@ interface Settings {
   motivation: boolean;
   motivation_time: string;
   weekly: boolean;
+  energy: boolean;
+  energy_gap_min: number;
+  energy_from: string;
+  energy_until: string;
 }
+const GAPS = [180, 210, 240, 270, 300, 360];
+const hoursLabel = (min: number) => `${(min / 60).toLocaleString('el-GR')} ώρες`;
 interface Envelope {
   settings: Settings;
   devices: number;
 }
 
-/** Push on this device, and what the person wants to be told: meal reminders, motivation, the weekly summary. */
+/** Push on this device, and what the person wants to be told: meal reminders, the call to eat, motivation, the weekly summary. */
 export function NotificationsCard() {
   const [push, setPush] = useState<PushState | null>(null);
   const [form, setForm] = useState<Settings | null>(null);
@@ -164,6 +170,34 @@ export function NotificationsCard() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      <Toggle
+        label="Φάε κάτι πριν πεινάσεις πολύ"
+        hint="Όταν περάσουν πολλές ώρες από το τελευταίο γεύμα που έγραψες, πριν πέσει η ενέργεια και φας παραπάνω μετά. Δεν έρχεται όταν έχεις καλύψει τον στόχο της μέρας."
+        checked={form.energy}
+        onChange={(v) => patch({ energy: v })}
+      />
+      {form.energy && (
+        <div className="entry-grid">
+          <Field label="Μετά από">
+            <select value={form.energy_gap_min} onChange={(e) => patch({ energy_gap_min: Number(e.target.value) })}>
+              {[...new Set([...GAPS, form.energy_gap_min])]
+                .sort((a, b) => a - b)
+                .map((m) => (
+                  <option key={m} value={m}>
+                    {hoursLabel(m)}
+                  </option>
+                ))}
+            </select>
+          </Field>
+          <Field label="Από">
+            <input type="time" required value={form.energy_from} onChange={(e) => patch({ energy_from: e.target.value })} />
+          </Field>
+          <Field label="Ως">
+            <input type="time" required value={form.energy_until} onChange={(e) => patch({ energy_until: e.target.value })} />
+          </Field>
         </div>
       )}
 

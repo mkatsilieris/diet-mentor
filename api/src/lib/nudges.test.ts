@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addDays } from './days.js';
 import { buildSummary, type Diet, type Inputs } from './summary.js';
-import { DEFAULT_SETTINGS, baselineKeys, dailyNudge, dietNudges, dueSlot, isTime, mealReminder, motivationNudges, weeklyNudge, type ReadySummary } from './nudges.js';
+import { DEFAULT_SETTINGS, baselineKeys, dailyNudge, dietNudges, dueSlot, energyGap, energyNudge, isTime, mealReminder, motivationNudges, weeklyNudge, type ReadySummary } from './nudges.js';
 
 const FRIDAY = '2026-11-13';
 const MONDAY = '2026-11-16';
@@ -103,4 +103,32 @@ test('settings decide what the daily run sends; old achievements form the baseli
   assert.deepEqual(motivationNudges(s, { ...DEFAULT_SETTINGS, motivation: false, weekly: false }), []);
   assert.ok(baselineKeys(s).includes('milestone/streak-7'));
   assert.ok(!baselineKeys(s).some((k) => k.startsWith('daily/')));
+});
+
+test('energy: speaks when the last meal is too far back, twice per gap at most', () => {
+  const S = DEFAULT_SETTINGS; // 4 hours, 08:00 - 21:30
+  const meals = [
+    { time: '09:00', kcal: 400 },
+    { time: '11:00', kcal: 5 }, // a coffee does not count
+  ];
+  assert.equal(energyGap('12:59', FRIDAY, meals, S), null);
+  const first = energyGap('13:00', FRIDAY, meals, S);
+  assert.ok(first);
+  assert.equal(first.dedupe, `energy/${FRIDAY}/09:00/0`);
+  assert.equal(energyGap('14:29', FRIDAY, meals, S)?.dedupe, first.dedupe);
+  assert.equal(energyGap('14:30', FRIDAY, meals, S)?.dedupe, `energy/${FRIDAY}/09:00/1`);
+  assert.equal(energyGap('18:00', FRIDAY, meals, S)?.dedupe, `energy/${FRIDAY}/09:00/1`); // nothing new after the repeat
+  assert.equal(energyGap('14:30', FRIDAY, [...meals, { time: '13:30', kcal: 600 }], S), null); // a meal restarts the count
+  assert.equal(energyGap('22:00', FRIDAY, meals, S), null); // outside the chosen part of the day
+  assert.equal(energyGap('13:00', FRIDAY, meals, { ...S, energy: false }), null);
+  assert.equal(energyGap('11:59', FRIDAY, [], S), null); // an empty day counts from 08:00
+  const empty = energyGap('12:00', FRIDAY, [], S);
+  assert.ok(empty);
+  assert.equal(empty.dedupe, `energy/${FRIDAY}/none/0`);
+
+  const n = energyNudge(first, summary({ intakes: [eat(FRIDAY, 400)] }));
+  assert.equal(n?.title, '4 ώρες χωρίς φαγητό');
+  assert.match(n?.body ?? '', /Τελευταίο γεύμα στις 09:00.*1\.760 kcal/);
+  assert.match(energyNudge(empty, summary())?.title ?? '', /τίποτα σήμερα/);
+  assert.equal(energyNudge(first, summary({ intakes: [eat(FRIDAY, 2100)] })), null); // the day is full
 });

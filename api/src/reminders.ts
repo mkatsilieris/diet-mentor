@@ -3,14 +3,25 @@ import { pool } from './db.js';
 import { log } from './log.js';
 import { todayIn } from './lib/days.js';
 import { buildSummary } from './lib/summary.js';
-import { DEFAULT_SETTINGS, baselineKeys, dueSlot, mealReminder, motivationNudges, type NotificationSettings, type Nudge } from './lib/nudges.js';
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_COLUMNS,
+  baselineKeys,
+  dueSlot,
+  energyGap,
+  energyNudge,
+  mealReminder,
+  motivationNudges,
+  type NotificationSettings,
+  type Nudge,
+} from './lib/nudges.js';
 import { sendPushToUser } from './notify.js';
 import { loadInputs } from './tracker.js';
 
 /**
  * The notification scheduler. Once a minute it looks at the clock (in DISPLAY_TZ) and, for every
  * person with a device that accepts push, sends the meal reminder or the daily motivation whose
- * time has come. What to say is decided in lib/nudges.ts; here is only the clock, the database and
+ * time has come, and the "eat something" call when the last meal is too far back. What to say is decided in lib/nudges.ts; here is only the clock, the database and
  * the sending. Every message is written to `notifications` first, under a key that is unique per
  * person, so nothing is sent twice - not after a restart, not with two ticks in the same window.
  */
@@ -27,7 +38,7 @@ export async function loadNotificationSettings(userId: number): Promise<Notifica
     `INSERT INTO notification_settings (user_id, reminders, reminder_times, motivation, motivation_time, weekly)
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
-     RETURNING reminders, reminder_times, motivation, motivation_time, weekly`,
+     RETURNING ${SETTINGS_COLUMNS}`,
     [userId, d.reminders, d.reminder_times, d.motivation, d.motivation_time, d.weekly],
   );
   return rows[0];
@@ -56,38 +67,68 @@ async function deliver(userId: number, nudge: Nudge): Promise<void> {
 
 type SettingsRow = NotificationSettings & { user_id: number };
 
+/** The entries of the day as the diary has them. */
+async function entriesOf(userId: number, day: string): Promise<{ time: string; kcal: number }[]> {
+  const { rows } = await pool.query<{ time: string; kcal: number }>(
+    `SELECT to_char(eaten_time, 'HH24:MI') AS time, kcal FROM food_entries WHERE user_id = $1 AND day = $2`,
+    [userId, day],
+  );
+  return rows;
+}
+
+const suppress = (userId: number, dedupe: string, why: string) =>
+  pool.query('UPDATE notifications SET suppressed = $3 WHERE user_id = $1 AND dedupe = $2', [userId, dedupe, why]);
+
+/** "Eat something": looked at every minute, because it depends on when the last meal was written. */
+async function runEnergy(s: SettingsRow, day: string, now: string): Promise<void> {
+  if (!s.energy || now < s.energy_from || now > s.energy_until) return;
+  const gap = energyGap(now, day, await entriesOf(s.user_id, day), s);
+  if (!gap) return;
+  // a meal reminder that just went out says enough; the gap is looked at again after it
+  const recent = await pool.query(
+    `SELECT 1 FROM notifications WHERE user_id = $1 AND kind = 'reminder' AND title IS NOT NULL AND created_at > now() - interval '45 minutes'`,
+    [s.user_id],
+  );
+  if (recent.rowCount) return;
+  if (!(await claim(s.user_id, gap.dedupe, 'energy'))) return;
+
+  const summary = buildSummary(await loadInputs(s.user_id));
+  const nudge = summary.ready ? energyNudge(gap, summary) : null;
+  if (nudge) await deliver(s.user_id, nudge);
+  else await suppress(s.user_id, gap.dedupe, summary.ready ? 'no room' : 'no profile');
+}
+
 async function runFor(s: SettingsRow, day: string, now: string): Promise<void> {
   const slot = s.reminders ? dueSlot(s.reminder_times, now) : null;
   const dailyDue = (s.motivation || s.weekly) && dueSlot([s.motivation_time], now) !== null;
-  if (!slot && !dailyDue) return;
 
   // take the keys before any work: most ticks inside a window end here
   const doReminder = slot !== null && (await claim(s.user_id, `reminder/${day}/${slot}`, 'reminder'));
   const doDaily = dailyDue && (await claim(s.user_id, `run/${day}`, 'run'));
-  if (!doReminder && !doDaily) return;
 
-  const summary = buildSummary(await loadInputs(s.user_id));
-  if (!summary.ready) return; // no profile yet: nothing to remind about
+  if (doReminder || doDaily) {
+    const summary = buildSummary(await loadInputs(s.user_id));
+    if (!summary.ready) return; // no profile yet: nothing to remind about
 
-  if (doReminder && slot) {
-    const { rows } = await pool.query<{ time: string }>(
-      `SELECT to_char(eaten_time, 'HH24:MI') AS time FROM food_entries WHERE user_id = $1 AND day = $2`,
-      [s.user_id, day],
-    );
-    const nudge = mealReminder(slot, s.reminder_times, rows.map((r) => r.time), summary);
-    if (nudge) await deliver(s.user_id, nudge);
-    else await pool.query(`UPDATE notifications SET suppressed = 'logged' WHERE user_id = $1 AND dedupe = $2`, [s.user_id, `reminder/${day}/${slot}`]);
-  }
-
-  if (doDaily) {
-    // the first run for a person only notes what is already achieved
-    if (await claim(s.user_id, 'baseline', 'run')) {
-      for (const key of baselineKeys(summary)) await claim(s.user_id, key, 'baseline');
+    if (doReminder && slot) {
+      const entries = await entriesOf(s.user_id, day);
+      const nudge = mealReminder(slot, s.reminder_times, entries.map((r) => r.time), summary);
+      if (nudge) await deliver(s.user_id, nudge);
+      else await suppress(s.user_id, `reminder/${day}/${slot}`, 'logged');
     }
-    for (const nudge of motivationNudges(summary, s)) {
-      if (await claim(s.user_id, nudge.dedupe, nudge.kind)) await deliver(s.user_id, nudge);
+
+    if (doDaily) {
+      // the first run for a person only notes what is already achieved
+      if (await claim(s.user_id, 'baseline', 'run')) {
+        for (const key of baselineKeys(summary)) await claim(s.user_id, key, 'baseline');
+      }
+      for (const nudge of motivationNudges(summary, s)) {
+        if (await claim(s.user_id, nudge.dedupe, nudge.kind)) await deliver(s.user_id, nudge);
+      }
     }
   }
+
+  await runEnergy(s, day, now);
 }
 
 let running = false;
@@ -99,7 +140,7 @@ export async function tick(now = new Date()): Promise<void> {
     const day = todayIn(config.timeZone, now);
     const time = timeIn(config.timeZone, now);
     const { rows } = await pool.query<SettingsRow>(
-      `SELECT s.user_id, s.reminders, s.reminder_times, s.motivation, s.motivation_time, s.weekly
+      `SELECT s.user_id, ${SETTINGS_COLUMNS}
          FROM notification_settings s
         WHERE EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = s.user_id)`,
     );

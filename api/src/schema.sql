@@ -97,6 +97,11 @@ CREATE TABLE IF NOT EXISTS notification_settings (
   weekly          BOOLEAN NOT NULL DEFAULT true,
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- "Eat something" when too long passed since the last meal, between the two times of the day.
+ALTER TABLE notification_settings ADD COLUMN IF NOT EXISTS energy         BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE notification_settings ADD COLUMN IF NOT EXISTS energy_gap_min INT NOT NULL DEFAULT 240;
+ALTER TABLE notification_settings ADD COLUMN IF NOT EXISTS energy_from    TEXT NOT NULL DEFAULT '08:00';
+ALTER TABLE notification_settings ADD COLUMN IF NOT EXISTS energy_until   TEXT NOT NULL DEFAULT '21:30';
 
 -- Every notification, written before it is sent: the key makes sure it goes out once per person.
 -- Rows without a title are keys that were taken without sending (not needed, or the baseline).
