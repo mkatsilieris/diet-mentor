@@ -1,5 +1,4 @@
-import { ZodError } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z, ZodError } from 'zod';
 import { ToolError, tools, type ApiCall, type Tool } from './tools.js';
 import type { TokenScope } from '../lib/tokens.js';
 
@@ -39,7 +38,12 @@ const INSTRUCTIONS =
 const allowed = (scope: TokenScope): Tool[] => (scope === 'write' ? tools : tools.filter((t) => !t.write));
 
 function describe(tool: Tool) {
-  const { $schema: _drop, ...schema } = zodToJsonSchema(tool.input, { $refStrategy: 'none' }) as Record<string, unknown>;
+  // io 'input': what the caller may send, so fields with a default stay optional;
+  // strict like the parse in callTool, so the schema says that unknown arguments are refused
+  const { $schema: _drop, ...schema } = z.toJSONSchema(tool.input.strict(), { io: 'input', unrepresentable: 'any' }) as Record<
+    string,
+    unknown
+  >;
   return {
     name: tool.name,
     title: tool.title,
