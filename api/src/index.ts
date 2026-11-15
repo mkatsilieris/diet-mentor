@@ -13,6 +13,8 @@ import { dietsRouter } from './routes/diets.js';
 import { summaryRouter } from './routes/summary.js';
 import { planRouter } from './routes/plan.js';
 import { notificationsRouter, pushRouter } from './routes/push.js';
+import { tokensRouter } from './routes/tokens.js';
+import { mcpRouter } from './routes/mcp.js';
 import { initPush } from './notify.js';
 import { startReminders } from './reminders.js';
 
@@ -37,6 +39,8 @@ app.use('/api/entries', entriesRouter);
 app.use('/api/foods', foodsRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/tokens', tokensRouter);
+app.use('/api/mcp', mcpRouter);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
 app.use(errorHandler);

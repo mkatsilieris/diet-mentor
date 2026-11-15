@@ -8,6 +8,7 @@
 //
 //   CLOUDFLARE_API_TOKEN=... node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com \
 //       [--account <account id>] [--team-domain <team>.cloudflareaccess.com] [--emails a@x.gr,b@y.gr | --copy-emails-from <hostname or id of another Access app>]
+//       [--claude]   also let https://<hostname>/api/mcp through Access, for Claude (the API checks a personal token)
 //
 // Token scopes (My Profile > API Tokens > Create Token > Custom):
 //   Account > Cloudflare Tunnel: Edit, Account > Access: Apps and Policies: Edit, Zone > DNS: Edit
@@ -126,6 +127,38 @@ else {
     include: emails.map((email) => ({ email: { email } })),
   });
   step(`policy "Family" created with ${emails.length} e-mail(s)`);
+}
+
+// ---- Claude (MCP) endpoint, only with --claude ----
+// Claude is a program: it cannot type the one-time code of the Access login page. A second, more
+// specific Access application lets requests to /api/mcp through Cloudflare without that login; the
+// API itself then asks for a personal access token on every call (see docs/CLAUDE.md, README).
+// Everything else on the hostname stays behind the Access login.
+if (args.claude) {
+  const mcpDomain = `${hostname}/api/mcp`;
+  let mcpApp = (await cf('GET', `/accounts/${account}/access/apps`)).find((a) => a.domain === mcpDomain);
+  if (mcpApp) step(`Access application "${mcpApp.name}" exists (${mcpApp.id})`);
+  else {
+    mcpApp = await cf('POST', `/accounts/${account}/access/apps`, {
+      name: `${appName} - Claude (MCP)`,
+      domain: mcpDomain,
+      type: 'self_hosted',
+      session_duration: '24h',
+      app_launcher_visible: false,
+    });
+    step(`Access application "${mcpApp.name}" created (${mcpApp.id})`);
+  }
+  const mcpPolicies = await cf('GET', `/accounts/${account}/access/apps/${mcpApp.id}/policies`);
+  if (mcpPolicies.length > 0) step(`policy "${mcpPolicies[0].name}" of ${mcpDomain} already exists, left as is`);
+  else {
+    await cf('POST', `/accounts/${account}/access/apps/${mcpApp.id}/policies`, {
+      name: 'Token checked by the API',
+      decision: 'bypass',
+      precedence: 1,
+      include: [{ everyone: {} }],
+    });
+    step(`policy "bypass" created for ${mcpDomain} (the API asks for a personal access token)`);
+  }
 }
 
 // ---- files ----

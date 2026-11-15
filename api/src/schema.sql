@@ -129,3 +129,18 @@ CREATE TABLE IF NOT EXISTS meal_plans (
   notify        BOOLEAN NOT NULL DEFAULT true,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Personal access tokens (Profile > Claude): let a program act as the person without their password.
+-- Only the SHA-256 of the token is kept; "hint" is its first characters, to recognise it in a list.
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id           SERIAL PRIMARY KEY,
+  user_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  token_hash   TEXT UNIQUE NOT NULL,
+  hint         TEXT NOT NULL,
+  scope        TEXT NOT NULL CHECK (scope IN ('read', 'write')),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at   TIMESTAMPTZ NOT NULL,
+  last_used_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens(user_id);

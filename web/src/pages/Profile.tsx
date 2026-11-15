@@ -6,6 +6,7 @@ import type { User } from '../types';
 import { Avatar, ErrorBox, Field, SuccessBox } from '../components/ui';
 import { NotificationsCard } from '../components/NotificationsCard';
 import { MealPlanCard } from '../components/MealPlanCard';
+import { ClaudeCard } from '../components/ClaudeCard';
 
 export default function Profile() {
   const { user, setUser, logout, viaAccess } = useAuth();
@@ -66,6 +67,7 @@ export default function Profile() {
 
       <MealPlanCard />
       <NotificationsCard />
+      <ClaudeCard />
 
       <section className="card stack">
         <h2>Όνομα</h2>

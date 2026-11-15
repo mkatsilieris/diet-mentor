@@ -31,6 +31,8 @@ Access), React PWA, Node API, PostgreSQL, docker compose για Raspberry Pi, ί
   τελευταίο γεύμα του ημερολογίου, πριν η πείνα φέρει υπερφαγία (ως δύο φορές ανά κενό, με 90 λεπτά διαφορά· όχι όταν
   ο στόχος της μέρας έχει καλυφθεί· καταχωρίσεις κάτω από 50 kcal δεν μετράνε για γεύμα), μία φορά τη μέρα πώς πήγε η χθεσινή, νέα ορόσημα και σταθμοί της δίαιτας, και κάθε
   Δευτέρα η σύνοψη της εβδομάδας. Οι κανόνες είναι στο `api/src/lib/nudges.ts`, ο scheduler στο `api/src/reminders.ts`.
+- **Σύνδεση με Claude** (Προφίλ → Σύνδεση με Claude): προσωπικό token για να κάνει το Claude ό,τι κάνεις κι εσύ στην
+  εφαρμογή (καταχωρίσεις, ζυγίσεις, δίαιτες, πλάνο, ειδοποιήσεις). Οδηγίες για τον χρήστη: [docs/CLAUDE.md](docs/CLAUDE.md).
 - Mobile-first UI στα ελληνικά, light/dark mode, PWA. Κάθε λογαριασμός βλέπει μόνο τα δικά του.
 
 ## Πώς υπολογίζει
@@ -130,6 +132,35 @@ node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com --copy-emails-fro
 κινητό δουλεύουν μέσω του tunnel: «Προσθήκη στην αρχική οθόνη» (υποχρεωτικό σε iPhone), άνοιγμα από εκεί, Προφίλ →
 Ειδοποιήσεις → Ενεργοποίηση → Δοκιμή.
 
+### Claude (MCP)
+
+Το API έχει ένα endpoint για το Claude, `POST /api/mcp` (Model Context Protocol, streamable HTTP, χωρίς sessions).
+Τα 24 εργαλεία του (`api/src/mcp/tools.ts`) καλούν τα ίδια routes με την εφαρμογή, με το token του χρήστη, άρα
+ισχύουν οι ίδιοι έλεγχοι και το «καθένας μόνο τα δικά του». Τι δίνεις σε έναν χρήστη: [docs/CLAUDE.md](docs/CLAUDE.md).
+
+Το Claude είναι πρόγραμμα και δεν μπορεί να περάσει τη σελίδα σύνδεσης του Cloudflare Access. Για να φτάνει στο
+endpoint από το Internet, τρέξε μία φορά το setup με `--claude`:
+
+```powershell
+$env:CLOUDFLARE_API_TOKEN = "..."
+node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com --claude
+```
+
+Φτιάχνει δεύτερη Access application μόνο για το `diet.ninblack.com/api/mcp` με policy `bypass`. Όλα τα υπόλοιπα
+μένουν πίσω από το Access. Από εκεί και πέρα την πόρτα τη φυλάει το API:
+
+- **Προσωπικά tokens** (`dmt_` + 256 τυχαία bits). Στη βάση μένει μόνο το SHA-256 τους (`api_tokens`), εμφανίζονται
+  μία φορά, λήγουν σε 30 / 90 / 365 ημέρες, ανακαλούνται από το Προφίλ, ως 10 ανά χρήστη.
+- **Δικαιώματα**: `read` (μόνο GET και μόνο τα εργαλεία ανάγνωσης) ή `write`. Κανένα token δεν φτιάχνει ή ανακαλεί
+  tokens ούτε αλλάζει κωδικό· αυτά θέλουν σύνδεση από την εφαρμογή (`requireSession`).
+- **Όρια**: 10 λάθος tokens ανά διεύθυνση σε 15 λεπτά και μετά `429`· 120 κλήσεις το λεπτό ανά token στο `/api/mcp`.
+- Το `/api/mcp` δέχεται μόνο προσωπικά tokens (όχι το JWT της εφαρμογής) και απορρίπτει αιτήματα με ξένο `Origin`.
+- **Ίχνος**: γραμμή `mcp tool call` στα logs για κάθε ενέργεια (χρήστης, token, εργαλείο, όχι τα περιεχόμενα).
+
+Το token ταξιδεύει στο header `Authorization`, άρα η διεύθυνση που δίνεις στους χρήστες πρέπει να είναι η https.
+Αν προτιμάς να μην είναι το endpoint ανοιχτό στο Internet, άλλαξε την policy σε `Service Auth` με ένα Access service
+token και δώσε στους χρήστες δύο επιπλέον headers (`CF-Access-Client-Id`, `CF-Access-Client-Secret`).
+
 ### Μεταφορά δεδομένων και backup
 
 ```powershell
@@ -166,5 +197,8 @@ cd api && npm test                            # tests υπολογισμών
 | GET/POST/DELETE | `/api/push/key` · `/api/push/subscribe` · `/api/push/test` | Web Push: κλειδί, εγγραφή συσκευής, δοκιμή |
 | GET/PUT | `/api/notifications` · GET `/api/notifications/history` | Ρυθμίσεις ειδοποιήσεων, τι στάλθηκε |
 | GET | `/api/summary` | Θερμίδες, σήμερα, ελλείμματα, γλυκογόνο, τρέχουσα δίαιτα, κίνητρο |
+| GET/POST | `/api/tokens` · DELETE `/api/tokens/:id` | Προσωπικά tokens (μόνο με σύνδεση από την εφαρμογή) |
+| POST | `/api/mcp` | Το endpoint του Claude (MCP), μόνο με προσωπικό token |
 
-Όλα τα endpoints εκτός των auth απαιτούν header `Authorization: Bearer <token>`.
+Όλα τα endpoints εκτός των auth απαιτούν header `Authorization: Bearer <token>`. Το token είναι είτε αυτό της
+σύνδεσης είτε προσωπικό token (`dmt_...`)· το ίδιο REST API δουλεύει και με τα δύο.
