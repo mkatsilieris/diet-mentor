@@ -35,7 +35,7 @@
 του `dmt_...`:
 
 ```bash
-claude mcp add --transport http --scope user diet-mentor https://diet.ninblack.com/api/mcp --header "Authorization: Bearer dmt_..."
+claude mcp add --transport http --scope user diet-mentor https://diet.ninblack.com/api/mcp --header "x-api-key: dmt_..."
 ```
 
 Το `--scope user` κάνει τη σύνδεση διαθέσιμη σε όλους τους φακέλους σου, όχι μόνο στον τρέχοντα.
@@ -62,10 +62,10 @@ Code το ίδιο φαίνεται με `/mcp`.
         "mcp-remote",
         "https://diet.ninblack.com/api/mcp",
         "--header",
-        "Authorization:${DIET_MENTOR_AUTH}"
+        "x-api-key:${DIET_MENTOR_KEY}"
       ],
       "env": {
-        "DIET_MENTOR_AUTH": "Bearer dmt_..."
+        "DIET_MENTOR_KEY": "dmt_..."
       }
     }
   }

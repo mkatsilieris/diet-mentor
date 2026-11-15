@@ -157,7 +157,7 @@ node scripts/cloudflare-setup.mjs --hostname diet.ninblack.com --claude
 - Το `/api/mcp` δέχεται μόνο προσωπικά tokens (όχι το JWT της εφαρμογής) και απορρίπτει αιτήματα με ξένο `Origin`.
 - **Ίχνος**: γραμμή `mcp tool call` στα logs για κάθε ενέργεια (χρήστης, token, εργαλείο, όχι τα περιεχόμενα).
 
-Το token ταξιδεύει στο header `Authorization`, άρα η διεύθυνση που δίνεις στους χρήστες πρέπει να είναι η https.
+Το token ταξιδεύει στο header `x-api-key` (σκέτο, χωρίς «Bearer»), άρα η διεύθυνση που δίνεις στους χρήστες πρέπει να είναι η https.
 Αν προτιμάς να μην είναι το endpoint ανοιχτό στο Internet, άλλαξε την policy σε `Service Auth` με ένα Access service
 token και δώσε στους χρήστες δύο επιπλέον headers (`CF-Access-Client-Id`, `CF-Access-Client-Secret`).
 
@@ -200,5 +200,5 @@ cd api && npm test                            # tests υπολογισμών
 | GET/POST | `/api/tokens` · DELETE `/api/tokens/:id` | Προσωπικά tokens (μόνο με σύνδεση από την εφαρμογή) |
 | POST | `/api/mcp` | Το endpoint του Claude (MCP), μόνο με προσωπικό token |
 
-Όλα τα endpoints εκτός των auth απαιτούν header `Authorization: Bearer <token>`. Το token είναι είτε αυτό της
-σύνδεσης είτε προσωπικό token (`dmt_...`)· το ίδιο REST API δουλεύει και με τα δύο.
+Όλα τα endpoints εκτός των auth απαιτούν είτε `x-api-key: <προσωπικό token dmt_...>` είτε
+`Authorization: Bearer <token>` (το token της σύνδεσης, που στέλνει η εφαρμογή, ή προσωπικό token).

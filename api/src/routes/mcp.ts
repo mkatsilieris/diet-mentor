@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { bearerToken, requireApiToken } from '../auth.js';
+import { requestToken, requireApiToken } from '../auth.js';
 import { config } from '../config.js';
 import { RateLimiter } from '../lib/ratelimit.js';
 import { handleMessage, type McpContext } from '../mcp/protocol.js';
@@ -44,11 +44,11 @@ function limit(req: Request, res: Response, next: NextFunction): void {
 
 /** Calls this API's own routes on the loopback interface, as the person, with the token they sent. */
 function loopback(req: Request): ApiCall {
-  const token = bearerToken(req)!;
+  const token = requestToken(req)!;
   return async (method, path, body) => {
     const res = await fetch(`http://127.0.0.1:${config.port}/api${path}`, {
       method,
-      headers: { Authorization: `Bearer ${token}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { 'x-api-key': token, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(20_000),
     });

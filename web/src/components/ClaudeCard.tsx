@@ -106,7 +106,7 @@ export function ClaudeCard() {
     );
   }
 
-  const command = fresh ? `claude mcp add --transport http diet-mentor ${serverUrl} --header "Authorization: Bearer ${fresh}"` : '';
+  const command = fresh ? `claude mcp add --transport http diet-mentor ${serverUrl} --header "x-api-key: ${fresh}"` : '';
 
   return (
     <section className="card stack">
