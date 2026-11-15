@@ -31,6 +31,22 @@ export function bearerToken(req: Request): string | null {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : null;
 }
 
+/** The value of the `x-api-key` header: a personal access token by itself, no "Bearer". */
+export function apiKey(req: Request): string | null {
+  const raw = req.headers['x-api-key'];
+  const key = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+  return key || null;
+}
+
+/**
+ * The credential of a request: `x-api-key: <personal token>` (what programs such as Claude send)
+ * or `Authorization: Bearer <token>` (what the web app sends; a personal token works there too).
+ * When both are present, Authorization is the one that counts.
+ */
+export function requestToken(req: Request): string | null {
+  return bearerToken(req) ?? apiKey(req);
+}
+
 /** Wrong personal access tokens per client address: 10 in 15 minutes, then the address waits. */
 const badTokens = new RateLimiter(10, 15 * 60_000);
 
@@ -42,11 +58,13 @@ interface TokenRow {
 }
 
 /**
- * Who is calling? Either a login session (the JWT the web app holds) or a personal access token
- * (`dmt_...`, made in Profile > Claude). Answers 401 / 429 itself and returns false when nobody is.
+ * Who is calling? Either a login session (the JWT the web app holds, in Authorization) or a personal
+ * access token (`dmt_...`, made in Profile > Claude; in x-api-key, or in Authorization as Bearer). Answers 401 / 429 itself and returns false when nobody is.
  */
 async function identify(req: Request, res: Response): Promise<boolean> {
-  const token = bearerToken(req);
+  const token = requestToken(req);
+  // x-api-key carries personal tokens only; a login session travels in Authorization
+  const keyOnly = bearerToken(req) === null;
   if (!token) {
     res.setHeader('WWW-Authenticate', 'Bearer');
     res.status(401).json({ error: 'Απαιτείται σύνδεση' });
@@ -83,6 +101,10 @@ async function identify(req: Request, res: Response): Promise<boolean> {
     return true;
   }
 
+  if (keyOnly) {
+    res.status(401).json({ error: 'Το x-api-key θέλει προσωπικό token (dmt_...), χωρίς «Bearer»' });
+    return false;
+  }
   try {
     const payload = jwt.verify(token, config.jwtSecret) as jwt.JwtPayload;
     req.user = { id: Number(payload.sub), email: String(payload.email) };
