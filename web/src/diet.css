@@ -426,3 +426,20 @@
 .plan-row input[type='time'] {
   width: auto;
 }
+
+/* ---- Claude: personal access tokens ---- */
+.token-secret {
+  display: block;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
